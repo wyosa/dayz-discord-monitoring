@@ -44,7 +44,7 @@ func updateStatus(s *discordgo.Session, status string, state string) (err error)
 func isDay(time string) (bool, error) {
 	res := strings.Split(time, ":")
 
-	hour, err := strconv.Atoi(res[1])
+	hour, err := strconv.Atoi(res[0])
 	if err != nil {
 		return false, err
 	}
