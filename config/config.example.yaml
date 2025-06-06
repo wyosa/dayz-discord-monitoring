@@ -1,0 +1,21 @@
+offline: "Server offline"
+emojis:
+  human: "👤"
+  day: "☀️"
+  night: "🌕"
+bots:
+- name: "Server #1"
+  discord_token: "YOUR_DISCORD_BOT_TOKEN"
+  update_interval: 10
+  server:
+    ip: "127.0.0.1"
+    port: 2801
+    query_port: 2802
+
+- name: "Server #2"
+  discord_token: "YOUR_DISCORD_BOT_TOKEN"
+  update_interval: 10
+  server:
+    ip: "127.0.0.2"
+    port: 2802
+    query_port: 2803
