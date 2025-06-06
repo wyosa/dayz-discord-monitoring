@@ -35,7 +35,6 @@ func main() {
 		log.Error("Cannot read config",
 			"error", err,
 		)
-
 		return
 	}
 
@@ -53,7 +52,7 @@ func main() {
 		go func(b bot.Bot) {
 			defer wg.Done()
 			err := b.Run(ctx, cfg.Emojis, cfg.OfflineText)
-			if err != nil {
+			if err != nil && err != ctx.Err() {
 				log.Error("Bot failed", "bot", b.Name, "error", err)
 			}
 		}(monitoringBot)

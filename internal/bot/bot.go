@@ -7,6 +7,8 @@ import (
 	"playground/internal/dayz"
 	"playground/internal/prettylog"
 	"playground/internal/types"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -15,6 +17,13 @@ import (
 const (
 	GUILD_LIMIT = 100
 )
+
+type Bot struct {
+	Name           string       `yaml:"name"`
+	DiscordToken   string       `yaml:"discord_token"`
+	UpdateInterval int          `yaml:"update_interval"`
+	Server         types.Server `yaml:"server"`
+}
 
 func updateStatus(s *discordgo.Session, status string, state string) (err error) {
 	data := discordgo.UpdateStatusData{
@@ -32,11 +41,19 @@ func updateStatus(s *discordgo.Session, status string, state string) (err error)
 	return s.UpdateStatusComplex(data)
 }
 
-type Bot struct {
-	Name           string       `yaml:"name"`
-	DiscordToken   string       `yaml:"discord_token"`
-	UpdateInterval int          `yaml:"update_interval"`
-	Server         types.Server `yaml:"server"`
+func isDay(time string) (bool, error) {
+	res := strings.Split(time, ":")
+
+	hour, err := strconv.Atoi(res[1])
+	if err != nil {
+		return false, err
+	}
+
+	if hour >= 6 && hour < 20 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) error {
@@ -78,31 +95,51 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 	ticker := time.NewTicker(time.Duration(b.UpdateInterval) * time.Second)
 	defer ticker.Stop()
 
+	getServerInfo := dayz.GetServerInfo(b.Server.Ip, b.Server.QueryPort)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			res, err := dayz.GetServerInfo(b.Server.Ip, b.Server.QueryPort)
+			timeouts, res, err := getServerInfo()
 			if err != nil {
 				log.Error(
 					"Server is offline, or the IP address or port is incorrect.",
 					"error", err,
 				)
 
-				updateStatus(
-					discord,
-					"dnd",
-					offlineText,
-				)
+				if timeouts >= 5 {
+					updateStatus(
+						discord,
+						"dnd",
+						offlineText,
+					)
+				}
 
-				break
+				continue
+			}
+
+			online := fmt.Sprintf(" %v %v/%v", emojis.Human, res.Players, res.MaxPlayers)
+			queue := ""
+			time := ""
+
+			if res.Queue != "" && res.Queue != "0" {
+				queue = fmt.Sprintf(" (+%s)", res.Queue)
+			}
+
+			if res.Time != "" {
+				if ok, _ := isDay(res.Time); ok {
+					time = fmt.Sprintf(" | %v %v", emojis.Day, res.Time)
+				} else {
+					time = fmt.Sprintf(" | %v %v", emojis.Night, res.Time)
+				}
 			}
 
 			updateStatus(
 				discord,
 				"online",
-				fmt.Sprintf("%s %v/%v", emojis.Human, res.Server.Players, res.Server.MaxPlayers),
+				fmt.Sprintf("%v%v%v", online, queue, time),
 			)
 		}
 	}

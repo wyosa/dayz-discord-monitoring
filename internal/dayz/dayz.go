@@ -4,58 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"net"
+	"strings"
 	"time"
 )
-
-type Info struct {
-	Server  ServerInfo
-	Rules   ServerRules
-	Players ServerPlayers
-}
-
-func GetServerInfo(ip string, port int) (Info, error) {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP == nil {
-		return Info{}, fmt.Errorf("Invalid IP address: %s", ip)
-	}
-
-	addr := &net.UDPAddr{
-		IP:   parsedIP,
-		Port: port,
-	}
-
-	conn, err := net.DialUDP("udp", nil, addr)
-	if err != nil {
-		return Info{}, err
-	}
-	defer conn.Close()
-
-	if err := conn.SetDeadline(time.Now().Add(4 * time.Second)); err != nil {
-		return Info{}, err
-	}
-
-	server, err1 := getInfo(conn)
-	rules, err2 := getRules(conn)
-	players, err3 := getPlayers(conn)
-	err = errors.Join(err1, err2, err3)
-	if err != nil {
-		return Info{}, err
-	}
-
-	fmt.Println(Info{
-		Server:  server,
-		Rules:   rules,
-		Players: players,
-	})
-
-	return Info{
-		Server:  server,
-		Rules:   rules,
-		Players: players,
-	}, nil
-}
 
 type ServerInfo struct {
 	Protocol    byte
@@ -66,6 +18,8 @@ type ServerInfo struct {
 	ID          uint16
 	Players     byte
 	MaxPlayers  byte
+	Time        string
+	Queue       string
 	Bots        byte
 	ServerType  byte
 	Environment byte
@@ -73,6 +27,45 @@ type ServerInfo struct {
 	VAC         byte
 	Version     string
 	EDF         byte
+	Keywords    string
+}
+
+func GetServerInfo(ip string, port int) func() (int, ServerInfo, error) {
+	timeoutsCounter := 0
+
+	return func() (int, ServerInfo, error) {
+		parsedIP := net.ParseIP(ip)
+		if parsedIP == nil {
+			timeoutsCounter++
+			return timeoutsCounter, ServerInfo{}, errors.New("invalid IP address")
+		}
+
+		addr := &net.UDPAddr{
+			IP:   parsedIP,
+			Port: port,
+		}
+
+		conn, err := net.DialUDP("udp", nil, addr)
+		if err != nil {
+			timeoutsCounter++
+			return timeoutsCounter, ServerInfo{}, err
+		}
+		defer conn.Close()
+
+		if err := conn.SetDeadline(time.Now().Add(4 * time.Second)); err != nil {
+			timeoutsCounter++
+			return timeoutsCounter, ServerInfo{}, err
+		}
+
+		info, err := getInfo(conn)
+		if err != nil {
+			timeoutsCounter++
+			return timeoutsCounter, ServerInfo{}, err
+		}
+
+		timeoutsCounter = 0
+		return timeoutsCounter, info, nil
+	}
 }
 
 func getInfo(conn *net.UDPConn) (ServerInfo, error) {
@@ -91,79 +84,117 @@ func getInfo(conn *net.UDPConn) (ServerInfo, error) {
 		return ServerInfo{}, err
 	}
 
-	data := bytes.NewBuffer(buffer[:n])
+	if n < 5 {
+		return ServerInfo{}, errors.New("response too short")
+	}
+
+	buf := bytes.NewBuffer(buffer[:n])
 	info := ServerInfo{}
 
-	// пропускаем первые 4 байта, потому что там лежит header
-	for i := 0; i < 4; i++ {
-		_, err := data.ReadByte()
-		if err != nil {
-			return ServerInfo{}, err
+	// Skip 4-byte header
+	buf.Next(4)
+
+	// Read protocol version
+	if err := binary.Read(buf, binary.LittleEndian, &info.Protocol); err != nil {
+		return info, err
+	}
+
+	if info.Name, err = buf.ReadString(0x00); err != nil {
+		return info, err
+	}
+	if info.Map, err = buf.ReadString(0x00); err != nil {
+		return info, err
+	}
+	if info.Folder, err = buf.ReadString(0x00); err != nil {
+		return info, err
+	}
+	if info.Game, err = buf.ReadString(0x00); err != nil {
+		return info, err
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &info.ID); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.Players); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.MaxPlayers); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.Bots); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.ServerType); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.Environment); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.Visibility); err != nil {
+		return info, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &info.VAC); err != nil {
+		return info, err
+	}
+
+	if info.Version, err = buf.ReadString(0x00); err != nil {
+		return info, err
+	}
+
+	// Optional EDF
+	if buf.Len() > 0 {
+		if err := binary.Read(buf, binary.LittleEndian, &info.EDF); err != nil {
+			return info, err
+		}
+
+		if info.EDF&0x80 != 0 {
+			var port uint16
+			if err := binary.Read(buf, binary.LittleEndian, &port); err != nil {
+				return info, err
+			}
+		}
+		if info.EDF&0x10 != 0 {
+			var steamID uint64
+			if err := binary.Read(buf, binary.LittleEndian, &steamID); err != nil {
+				return info, err
+			}
+		}
+		if info.EDF&0x40 != 0 {
+			var tvPort uint16
+			if err := binary.Read(buf, binary.LittleEndian, &tvPort); err != nil {
+				return info, err
+			}
+			if _, err := buf.ReadString(0x00); err != nil {
+				return info, err
+			}
+		}
+		if info.EDF&0x20 != 0 {
+			if info.Keywords, err = buf.ReadString(0x00); err != nil {
+				return info, err
+			}
+		}
+		if info.EDF&0x01 != 0 {
+			var gameID uint64
+			if err := binary.Read(buf, binary.LittleEndian, &gameID); err != nil {
+				return info, err
+			}
 		}
 	}
 
-	binary.Read(data, binary.LittleEndian, &info.Protocol)
-	info.Name, _ = readNullTerminatedString(data)
-	info.Map, _ = readNullTerminatedString(data)
-	info.Folder, _ = readNullTerminatedString(data)
-	info.Game, _ = readNullTerminatedString(data)
-	binary.Read(data, binary.LittleEndian, &info.ID)
-	binary.Read(data, binary.LittleEndian, &info.Players)
-	binary.Read(data, binary.LittleEndian, &info.MaxPlayers)
-	binary.Read(data, binary.LittleEndian, &info.Bots)
-	binary.Read(data, binary.LittleEndian, &info.ServerType)
-	binary.Read(data, binary.LittleEndian, &info.Environment)
-	binary.Read(data, binary.LittleEndian, &info.Visibility)
-	binary.Read(data, binary.LittleEndian, &info.VAC)
-	info.Version, _ = readNullTerminatedString(data)
-	binary.Read(data, binary.LittleEndian, &info.EDF)
+	if info.Keywords != "" {
+		keywords := strings.Split(info.Keywords, ",")
+		for _, keyword := range keywords {
+			// Find queue
+			if strings.Contains(keyword, "lqs") {
+				info.Queue = strings.TrimPrefix(keyword, "lqs")
+			}
+
+			// Find time
+			if strings.Contains(keyword, ":") {
+				info.Time = keyword
+			}
+		}
+	}
 
 	return info, nil
-}
-
-type ServerRules struct{}
-
-func getRules(conn *net.UDPConn) (ServerRules, error) {
-	A2S_RULES_REQUEST := []byte{
-		0xFF, 0xFF, 0xFF, 0xFF,
-		'V',
-		'S', 'o', 'u', 'r', 'c', 'e', ' ', 'E', 'n', 'g', 'i', 'n', 'e', ' ', 'Q', 'u', 'e', 'r', 'y',
-		0x00,
-	}
-
-	_ = conn
-	_ = A2S_RULES_REQUEST
-
-	return ServerRules{}, nil
-}
-
-type ServerPlayers struct{}
-
-func getPlayers(conn *net.UDPConn) (ServerPlayers, error) {
-	A2S_PLAYER_REQUEST := []byte{
-		0xFF, 0xFF, 0xFF, 0xFF,
-		'U',
-		'S', 'o', 'u', 'r', 'c', 'e', ' ', 'E', 'n', 'g', 'i', 'n', 'e', ' ', 'Q', 'u', 'e', 'r', 'y',
-		0x00,
-	}
-
-	_ = conn
-	_ = A2S_PLAYER_REQUEST
-
-	return ServerPlayers{}, nil
-}
-
-func readNullTerminatedString(buf *bytes.Buffer) (string, error) {
-	var result []byte
-	for {
-		b, err := buf.ReadByte()
-		if err != nil {
-			return "", err
-		}
-		if b == 0x00 {
-			break
-		}
-		result = append(result, b)
-	}
-	return string(result), nil
 }
