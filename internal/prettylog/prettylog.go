@@ -61,6 +61,22 @@ func suppressDefaults(
 	}
 }
 
+func NewHandler(opts *slog.HandlerOptions) *Handler {
+	if opts == nil {
+		opts = &slog.HandlerOptions{}
+	}
+	b := &bytes.Buffer{}
+	return &Handler{
+		b: b,
+		h: slog.NewJSONHandler(b, &slog.HandlerOptions{
+			Level:       opts.Level,
+			AddSource:   opts.AddSource,
+			ReplaceAttr: suppressDefaults(opts.ReplaceAttr),
+		}),
+		m: &sync.Mutex{},
+	}
+}
+
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 	return h.h.Enabled(ctx, level)
 }
@@ -95,7 +111,6 @@ func (h *Handler) computeAttrs(
 }
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
-
 	level := r.Level.String() + ":"
 
 	switch r.Level {
@@ -129,25 +144,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		args = append(args, colorize(darkGray, string(bytes)))
 	}
 
-	fmt.Println(args...)
-
 	return nil
-}
-
-func NewHandler(opts *slog.HandlerOptions) *Handler {
-	if opts == nil {
-		opts = &slog.HandlerOptions{}
-	}
-	b := &bytes.Buffer{}
-	return &Handler{
-		b: b,
-		h: slog.NewJSONHandler(b, &slog.HandlerOptions{
-			Level:       opts.Level,
-			AddSource:   opts.AddSource,
-			ReplaceAttr: suppressDefaults(opts.ReplaceAttr),
-		}),
-		m: &sync.Mutex{},
-	}
 }
 
 func NewLogger(level slog.Level, addSource bool) *slog.Logger {

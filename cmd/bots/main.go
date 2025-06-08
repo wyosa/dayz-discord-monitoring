@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log/slog"
 	"os"
@@ -13,11 +14,13 @@ import (
 	"time"
 )
 
-var (
-	configPath = flag.String("config", "", "Path to config file (YAML)")
+const (
+	timeoutTime = 10
 )
 
 func main() {
+	configPath := flag.String("config", "", "Path to config file (YAML)")
+
 	flag.Parse()
 
 	log := prettylog.NewLogger(slog.LevelDebug, false)
@@ -46,7 +49,7 @@ func main() {
 		go func(b bot.Bot) {
 			defer wg.Done()
 			err := b.Run(ctx, cfg.Emojis, cfg.OfflineText)
-			if err != nil && err != ctx.Err() {
+			if err != nil && errors.Is(err, ctx.Err()) {
 				log.Error("Bot failed", "bot", b.Name, "error", err)
 			}
 		}(monitoringBot)
@@ -65,7 +68,7 @@ func main() {
 	select {
 	case <-done:
 		log.Info("All bots shut down successfully")
-	case <-time.After(10 * time.Second):
+	case <-time.After(timeoutTime * time.Second):
 		log.Warn("Force shutdown after timeout.")
 	}
 }

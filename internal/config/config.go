@@ -8,8 +8,8 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
-// Config represents the main application configuration structure
-// loaded from YAML configuration file
+// Config represents the main application configuration structure.
+// loaded from YAML configuration file.
 type Config struct {
 	Bots        []bot.Bot    `yaml:"bots"`    // List of Discord bots to run
 	Emojis      types.Emojis `yaml:"emojis"`  // Emoji configuration for state display

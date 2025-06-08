@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// Server represents a DayZ server connection configuration
+// Server represents a DayZ server connection configuration.
 type Server struct {
-	Ip        string // Server IP address
+	IP        string // Server IP address
 	QueryPort int    // Query port for A2S_INFO requests
 }
 
-// ServerInfo contains all information returned by A2S_INFO query
-// Based on Source Engine Query protocol specification
+// ServerInfo contains all information returned by A2S_INFO query.
+// Based on Source Engine Query protocol specification.
 type ServerInfo struct {
 	Protocol    byte   // Protocol version used by the server
 	Name        string // Server name
@@ -37,24 +37,22 @@ type ServerInfo struct {
 	EDF         byte   // Extra Data Flag - indicates which optional fields are present
 	Keywords    string // Server keywords containing custom data
 	Port        uint16 // Server port number
-	SteamId     uint64 // Server's Steam ID
+	SteamID     uint64 // Server's Steam ID
 	TVPort      uint16 // Source TV port
-	GameId      uint64 // Game ID
+	GameID      uint64 // Game ID
 }
 
-var (
-	a2sInfoRequest = []byte{
-		0xFF, 0xFF, 0xFF, 0xFF,
-		'T',
-		'S', 'o', 'u', 'r', 'c', 'e', ' ', 'E', 'n', 'g', 'i', 'n', 'e', ' ', 'Q', 'u', 'e', 'r', 'y',
-		0x00,
-	}
+const (
+	headerByteSize int = 4
+	zeroByte byte = 0x00
+	timeoutTime = 3
+	optimalBufferSize int = 1400
 )
 
-// GetServerInfo queries the DayZ server for current status information
-// Uses the A2S_INFO protocol to retrieve server details
+// GetServerInfo queries the DayZ server for current status information.
+// Uses the A2S_INFO protocol to retrieve server details.
 func (server Server) GetServerInfo() (ServerInfo, error) {
-	parsedIP := net.ParseIP(server.Ip)
+	parsedIP := net.ParseIP(server.IP)
 	if parsedIP == nil {
 		return ServerInfo{}, errors.New("invalid IP address")
 	}
@@ -70,8 +68,15 @@ func (server Server) GetServerInfo() (ServerInfo, error) {
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(4 * time.Second)); err != nil {
+	if err = conn.SetDeadline(time.Now().Add(timeoutTime * time.Second)); err != nil {
 		return ServerInfo{}, err
+	}
+
+	a2sInfoRequest := []byte{
+		0xFF, 0xFF, 0xFF, 0xFF,
+		'T',
+		'S', 'o', 'u', 'r', 'c', 'e', ' ', 'E', 'n', 'g', 'i', 'n', 'e', ' ', 'Q', 'u', 'e', 'r', 'y',
+		0x00,
 	}
 
 	_, err = conn.Write(a2sInfoRequest)
@@ -79,13 +84,13 @@ func (server Server) GetServerInfo() (ServerInfo, error) {
 		return ServerInfo{}, err
 	}
 
-	buffer := make([]byte, 1400)
+	buffer := make([]byte, optimalBufferSize)
 	n, _, err := conn.ReadFromUDP(buffer)
 	if err != nil {
 		return ServerInfo{}, err
 	}
 
-	if n < 5 {
+	if n <= headerByteSize {
 		return ServerInfo{}, errors.New("response too short")
 	}
 
@@ -93,84 +98,84 @@ func (server Server) GetServerInfo() (ServerInfo, error) {
 	info := ServerInfo{}
 
 	// Skip the 4-byte response header
-	buf.Next(4)
+	buf.Next(headerByteSize)
 
 	// Parse required fields
-	if err := binary.Read(buf, binary.LittleEndian, &info.Protocol); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.Protocol); err != nil {
 		return info, err
 	}
-	if info.Name, err = buf.ReadString(0x00); err != nil {
+	if info.Name, err = buf.ReadString(zeroByte); err != nil {
 		return info, err
 	}
-	if info.Map, err = buf.ReadString(0x00); err != nil {
+	if info.Map, err = buf.ReadString(zeroByte); err != nil {
 		return info, err
 	}
-	if info.Folder, err = buf.ReadString(0x00); err != nil {
+	if info.Folder, err = buf.ReadString(zeroByte); err != nil {
 		return info, err
 	}
-	if info.Game, err = buf.ReadString(0x00); err != nil {
+	if info.Game, err = buf.ReadString(zeroByte); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.ID); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.ID); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.Players); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.Players); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.MaxPlayers); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.MaxPlayers); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.Bots); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.Bots); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.ServerType); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.ServerType); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.Environment); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.Environment); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.Visibility); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.Visibility); err != nil {
 		return info, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &info.VAC); err != nil {
+	if err = binary.Read(buf, binary.LittleEndian, &info.VAC); err != nil {
 		return info, err
 	}
-	if info.Version, err = buf.ReadString(0x00); err != nil {
+	if info.Version, err = buf.ReadString(zeroByte); err != nil {
 		return info, err
 	}
 
 	// Parse optional EDF
 	if buf.Len() > 0 {
-		if err := binary.Read(buf, binary.LittleEndian, &info.EDF); err != nil {
+		if err = binary.Read(buf, binary.LittleEndian, &info.EDF); err != nil {
 			return info, err
 		}
 
 		if info.EDF&0x80 != 0 {
-			if err := binary.Read(buf, binary.LittleEndian, &info.Port); err != nil {
+			if err = binary.Read(buf, binary.LittleEndian, &info.Port); err != nil {
 				return info, err
 			}
 		}
 
 		if info.EDF&0x10 != 0 {
-			if err := binary.Read(buf, binary.LittleEndian, &info.SteamId); err != nil {
+			if err = binary.Read(buf, binary.LittleEndian, &info.SteamID); err != nil {
 				return info, err
 			}
 		}
 		if info.EDF&0x40 != 0 {
-			if err := binary.Read(buf, binary.LittleEndian, &info.TVPort); err != nil {
+			if err = binary.Read(buf, binary.LittleEndian, &info.TVPort); err != nil {
 				return info, err
 			}
-			if _, err := buf.ReadString(0x00); err != nil {
+			if _, err = buf.ReadString(zeroByte); err != nil {
 				return info, err
 			}
 		}
 		if info.EDF&0x20 != 0 {
-			if info.Keywords, err = buf.ReadString(0x00); err != nil {
+			if info.Keywords, err = buf.ReadString(zeroByte); err != nil {
 				return info, err
 			}
 		}
 		if info.EDF&0x01 != 0 {
-			if err := binary.Read(buf, binary.LittleEndian, &info.GameId); err != nil {
+			if err = binary.Read(buf, binary.LittleEndian, &info.GameID); err != nil {
 				return info, err
 			}
 		}

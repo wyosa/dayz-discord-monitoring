@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	guildLimit  = 100 // Maximum number of guilds for name change
-	maxTimeouts = 5   // Maximum number of consecutive timeouts before marking server as offline
+	guildLimit int  = 200 // Maximum number of guilds for name change
+	maxTimeouts int = 5   // Maximum number of consecutive timeouts before marking server as offline
 )
 
-// Discord bot configuration
+// Bot configuration.
 type Bot struct {
 	Name           string       `yaml:"name"`            // Bot display name
 	DiscordToken   string       `yaml:"discord_token"`   // Discord bot token
@@ -27,12 +27,12 @@ type Bot struct {
 	Server         types.Server `yaml:"server"`          // DayZ server configuration
 }
 
-// isStatusChanged checks if any of the server status values have changed
+// isStatusChanged checks if any of the server status values have changed.
 func isStatusChanged(res dayz.ServerInfo, online byte, queue, time string) bool {
 	return online != res.Players || queue != res.Queue || time != res.Time
 }
 
-// isDay determines if the given time string represents daytime (06:00-19:59)
+// isDay determines if the given time string represents daytime (06:00-19:59).
 func isDay(time string) (bool, error) {
 	res := strings.Split(time, ":")
 
@@ -49,7 +49,7 @@ func isDay(time string) (bool, error) {
 }
 
 // buildStatusString creates a formatted status string for Discord presence.
-// Format: 👤 5/20 (+3) | 🌞 12:30
+// Format: 👤 5/20 (+3) | 🌞 12:30.
 func buildStateString(res *dayz.ServerInfo, emojis types.Emojis) (string, error) {
 	onlineString := fmt.Sprintf(" %v %v/%v", emojis.Human, res.Players, res.MaxPlayers)
 
@@ -74,7 +74,7 @@ func buildStateString(res *dayz.ServerInfo, emojis types.Emojis) (string, error)
 	return fmt.Sprintf("%v%v%v", onlineString, queueString, timeString), nil
 }
 
-// updateStatus updates the Discord bot's presence status
+// updateStatus updates the Discord bot's presence status.
 func updateStatus(discord *discordgo.Session, status string, state string) error {
 	data := discordgo.UpdateStatusData{
 		Status: status,
@@ -91,8 +91,8 @@ func updateStatus(discord *discordgo.Session, status string, state string) error
 	return discord.UpdateStatusComplex(data)
 }
 
-// handleServerError handles server connection errors and timeout logic
-func handleServerError(err error, timeouts *int, maxTimeouts int, discord *discordgo.Session, log *slog.Logger, offlineText string) {
+// handleServerError handles server connection errors and timeout logic.
+func handleServerError(err error, timeouts *int, maxTimeouts int, discord *discordgo.Session, log *slog.Logger, offlineText string) error {
 	log.Error(
 		"Server is offline, or the IP address or port is incorrect.",
 		"error", err,
@@ -100,11 +100,16 @@ func handleServerError(err error, timeouts *int, maxTimeouts int, discord *disco
 	(*timeouts)++
 
 	if *timeouts >= maxTimeouts {
-		updateStatus(discord, "dnd", offlineText)
+		err = updateStatus(discord, "dnd", offlineText)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-// Updates the bot's Discord status with actual server information
+// Updates the bot's Discord status with actual server information.
 func updateServerStatus(discord *discordgo.Session, log *slog.Logger, res *dayz.ServerInfo, emojis types.Emojis, online *byte, queue, time *string) error {
 	*online, *queue, *time = res.Players, res.Queue, res.Time
 
@@ -128,7 +133,7 @@ func updateServerStatus(discord *discordgo.Session, log *slog.Logger, res *dayz.
 	return nil
 }
 
-// Changes the bot's nickname to the configured name in all guilds
+// Changes the bot's nickname to the configured name in all guilds.
 func updateBotNameInAllGuilds(discord *discordgo.Session, log *slog.Logger, name string) error {
 	guilds, err := discord.UserGuilds(guildLimit, "", "", false)
 	if err != nil {
@@ -140,7 +145,7 @@ func updateBotNameInAllGuilds(discord *discordgo.Session, log *slog.Logger, name
 	}
 
 	for _, g := range guilds {
-		err := discord.GuildMemberNickname(g.ID, "@me", name)
+		err = discord.GuildMemberNickname(g.ID, "@me", name)
 		if err != nil {
 			return err
 		}
@@ -149,7 +154,7 @@ func updateBotNameInAllGuilds(discord *discordgo.Session, log *slog.Logger, name
 	return nil
 }
 
-// Runs the bot and begins monitoring the DayZ server
+// Run the bot and begins monitoring the DayZ server.
 func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) error {
 	log := prettylog.NewLogger(slog.LevelDebug, false)
 
@@ -164,19 +169,22 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 	}
 	defer discord.Close()
 
-	log.Info(fmt.Sprintf("Bot for \"%s\" started", b.Name),
+	log.InfoContext(ctx, fmt.Sprintf("Bot for \"%s\" started", b.Name),
 		"name", b.Name,
-		"ip", fmt.Sprintf("%v:%v", b.Server.Ip, b.Server.Port),
+		"ip", fmt.Sprintf("%v:%v", b.Server.IP, b.Server.Port),
 		"interval", fmt.Sprintf("%ds", b.UpdateInterval),
 	)
 
-	updateBotNameInAllGuilds(discord, log, b.Name)
+	err = updateBotNameInAllGuilds(discord, log, b.Name)
+	if err != nil {
+		return err
+	}
 
 	ticker := time.NewTicker(time.Duration(b.UpdateInterval) * time.Second)
 	defer ticker.Stop()
 
 	server := dayz.Server{
-		Ip:        b.Server.Ip,
+		IP:        b.Server.IP,
 		QueryPort: b.Server.QueryPort,
 	}
 
@@ -191,7 +199,11 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 		case <-ticker.C:
 			res, err := server.GetServerInfo()
 			if err != nil {
-				handleServerError(err, &timeouts, maxTimeouts, discord, log, offlineText)
+				err = handleServerError(err, &timeouts, maxTimeouts, discord, log, offlineText)
+				if err != nil {
+					return err
+				}
+
 				continue
 			}
 
