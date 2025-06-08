@@ -8,22 +8,24 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+// Config represents the main application configuration structure
+// loaded from YAML configuration file
 type Config struct {
-	Bots        []bot.Bot    `yaml:"bots"`
-	Emojis      types.Emojis `yaml:"emojis"`
-	OfflineText string       `yaml:"offline"`
+	Bots        []bot.Bot    `yaml:"bots"`    // List of Discord bots to run
+	Emojis      types.Emojis `yaml:"emojis"`  // Emoji configuration for state display
+	OfflineText string       `yaml:"offline"` // Text to display when server is offline
 }
 
-func MustLoad(configPath string) (*Config, error) {
+func MustLoad(configPath string) *Config {
 	var cfg Config
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, err
+		panic(err)
 	}
 
 	if err := cleanenv.ReadConfig(configPath, &cfg); err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return &cfg, nil
+	return &cfg
 }

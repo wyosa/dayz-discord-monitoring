@@ -1,18 +1,20 @@
-offline: "Server offline"
-emojis:
-  human: "👤"
-  day: "☀️"
-  night: "🌕"
-bots:
-- name: "Server #1"
-  discord_token: "YOUR_DISCORD_BOT_TOKEN"
-  update_interval: 10
-  server:
-    ip: "127.0.0.1"
-    port: 2801
-    query_port: 2802
+offline: "Server offline" # The name shown for the bot when the DayZ server is offline. This will be applied across all Discord guilds where the bot is present.
 
-- name: "Server #2"
+emojis:
+  human: "👤" # Emoji representing human players; used to indicate the number of players online.
+  day: "☀️" # Emoji indicating it's daytime in the DayZ server.
+  night: "🌕" # Emoji indicating it's nighttime in the DayZ server.
+
+bots:
+- name: "Server #1" # The display name for this bot instance (max 32 characters).
+  discord_token: "YOUR_DISCORD_BOT_TOKEN" # The Discord bot token from the Developer Portal.
+  update_interval: 10 # How often (in seconds) the bot fetches data from the DayZ server and updates its status.
+  server:
+    ip: "127.0.0.1" # IP address of the DayZ game server to monitor.
+    port: 2801 # Game port of the DayZ server.
+    query_port: 2802 # Query port of the DayZ server (used to fetch server info).
+
+- name: "Server #2" # Another bot instance monitoring a different server.
   discord_token: "YOUR_DISCORD_BOT_TOKEN"
   update_interval: 10
   server:

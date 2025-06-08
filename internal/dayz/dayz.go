@@ -9,74 +9,75 @@ import (
 	"time"
 )
 
+// Server represents a DayZ server connection configuration
+type Server struct {
+	Ip        string // Server IP address
+	QueryPort int    // Query port for A2S_INFO requests
+}
+
+// ServerInfo contains all information returned by A2S_INFO query
+// Based on Source Engine Query protocol specification
 type ServerInfo struct {
-	Protocol    byte
-	Name        string
-	Map         string
-	Folder      string
-	Game        string
-	ID          uint16
-	Players     byte
-	MaxPlayers  byte
-	Time        string
-	Queue       string
-	Bots        byte
-	ServerType  byte
-	Environment byte
-	Visibility  byte
-	VAC         byte
-	Version     string
-	EDF         byte
-	Keywords    string
+	Protocol    byte   // Protocol version used by the server
+	Name        string // Server name
+	Map         string // Current map name
+	Folder      string // Game directory name
+	Game        string // Game name
+	ID          uint16 // Application ID of the game
+	Players     byte   // Current number of players
+	MaxPlayers  byte   // Maximum number of players
+	Time        string // Current in-game time (parsed from keywords)
+	Queue       string // Queue length (parsed from keywords)
+	Bots        byte   // Number of bots on the server
+	ServerType  byte   // Server type (dedicated/listen/proxy)
+	Environment byte   // Server environment (Linux/Windows/Mac)
+	Visibility  byte   // Server visibility (public/private)
+	VAC         byte   // VAC status (secured/unsecured)
+	Version     string // Server version
+	EDF         byte   // Extra Data Flag - indicates which optional fields are present
+	Keywords    string // Server keywords containing custom data
+	Port        uint16 // Server port number
+	SteamId     uint64 // Server's Steam ID
+	TVPort      uint16 // Source TV port
+	GameId      uint64 // Game ID
 }
 
-func GetServerInfo(ip string, port int) func() (int, ServerInfo, error) {
-	timeoutsCounter := 0
-
-	return func() (int, ServerInfo, error) {
-		parsedIP := net.ParseIP(ip)
-		if parsedIP == nil {
-			timeoutsCounter++
-			return timeoutsCounter, ServerInfo{}, errors.New("invalid IP address")
-		}
-
-		addr := &net.UDPAddr{
-			IP:   parsedIP,
-			Port: port,
-		}
-
-		conn, err := net.DialUDP("udp", nil, addr)
-		if err != nil {
-			timeoutsCounter++
-			return timeoutsCounter, ServerInfo{}, err
-		}
-		defer conn.Close()
-
-		if err := conn.SetDeadline(time.Now().Add(4 * time.Second)); err != nil {
-			timeoutsCounter++
-			return timeoutsCounter, ServerInfo{}, err
-		}
-
-		info, err := getInfo(conn)
-		if err != nil {
-			timeoutsCounter++
-			return timeoutsCounter, ServerInfo{}, err
-		}
-
-		timeoutsCounter = 0
-		return timeoutsCounter, info, nil
-	}
-}
-
-func getInfo(conn *net.UDPConn) (ServerInfo, error) {
-	A2S_INFO_REQUEST := []byte{
+var (
+	a2sInfoRequest = []byte{
 		0xFF, 0xFF, 0xFF, 0xFF,
 		'T',
 		'S', 'o', 'u', 'r', 'c', 'e', ' ', 'E', 'n', 'g', 'i', 'n', 'e', ' ', 'Q', 'u', 'e', 'r', 'y',
 		0x00,
 	}
+)
 
-	conn.Write(A2S_INFO_REQUEST)
+// GetServerInfo queries the DayZ server for current status information
+// Uses the A2S_INFO protocol to retrieve server details
+func (server Server) GetServerInfo() (ServerInfo, error) {
+	parsedIP := net.ParseIP(server.Ip)
+	if parsedIP == nil {
+		return ServerInfo{}, errors.New("invalid IP address")
+	}
+
+	addr := &net.UDPAddr{
+		IP:   parsedIP,
+		Port: server.QueryPort,
+	}
+
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		return ServerInfo{}, err
+	}
+	defer conn.Close()
+
+	if err := conn.SetDeadline(time.Now().Add(4 * time.Second)); err != nil {
+		return ServerInfo{}, err
+	}
+
+	_, err = conn.Write(a2sInfoRequest)
+	if err != nil {
+		return ServerInfo{}, err
+	}
 
 	buffer := make([]byte, 1400)
 	n, _, err := conn.ReadFromUDP(buffer)
@@ -91,14 +92,13 @@ func getInfo(conn *net.UDPConn) (ServerInfo, error) {
 	buf := bytes.NewBuffer(buffer[:n])
 	info := ServerInfo{}
 
-	// Skip 4-byte header
+	// Skip the 4-byte response header
 	buf.Next(4)
 
-	// Read protocol version
+	// Parse required fields
 	if err := binary.Read(buf, binary.LittleEndian, &info.Protocol); err != nil {
 		return info, err
 	}
-
 	if info.Name, err = buf.ReadString(0x00); err != nil {
 		return info, err
 	}
@@ -111,7 +111,6 @@ func getInfo(conn *net.UDPConn) (ServerInfo, error) {
 	if info.Game, err = buf.ReadString(0x00); err != nil {
 		return info, err
 	}
-
 	if err := binary.Read(buf, binary.LittleEndian, &info.ID); err != nil {
 		return info, err
 	}
@@ -136,32 +135,29 @@ func getInfo(conn *net.UDPConn) (ServerInfo, error) {
 	if err := binary.Read(buf, binary.LittleEndian, &info.VAC); err != nil {
 		return info, err
 	}
-
 	if info.Version, err = buf.ReadString(0x00); err != nil {
 		return info, err
 	}
 
-	// Optional EDF
+	// Parse optional EDF
 	if buf.Len() > 0 {
 		if err := binary.Read(buf, binary.LittleEndian, &info.EDF); err != nil {
 			return info, err
 		}
 
 		if info.EDF&0x80 != 0 {
-			var port uint16
-			if err := binary.Read(buf, binary.LittleEndian, &port); err != nil {
+			if err := binary.Read(buf, binary.LittleEndian, &info.Port); err != nil {
 				return info, err
 			}
 		}
+
 		if info.EDF&0x10 != 0 {
-			var steamID uint64
-			if err := binary.Read(buf, binary.LittleEndian, &steamID); err != nil {
+			if err := binary.Read(buf, binary.LittleEndian, &info.SteamId); err != nil {
 				return info, err
 			}
 		}
 		if info.EDF&0x40 != 0 {
-			var tvPort uint16
-			if err := binary.Read(buf, binary.LittleEndian, &tvPort); err != nil {
+			if err := binary.Read(buf, binary.LittleEndian, &info.TVPort); err != nil {
 				return info, err
 			}
 			if _, err := buf.ReadString(0x00); err != nil {
@@ -174,22 +170,23 @@ func getInfo(conn *net.UDPConn) (ServerInfo, error) {
 			}
 		}
 		if info.EDF&0x01 != 0 {
-			var gameID uint64
-			if err := binary.Read(buf, binary.LittleEndian, &gameID); err != nil {
+			if err := binary.Read(buf, binary.LittleEndian, &info.GameId); err != nil {
 				return info, err
 			}
 		}
 	}
 
+	// Parse DayZ-specific information from keywords
 	if info.Keywords != "" {
 		keywords := strings.Split(info.Keywords, ",")
+
 		for _, keyword := range keywords {
-			// Find queue
+			// Extract queue length (format: "lqs<number>")
 			if strings.Contains(keyword, "lqs") {
 				info.Queue = strings.TrimPrefix(keyword, "lqs")
 			}
 
-			// Find time
+			// Extract in-game time (format: "HH:MM")
 			if strings.Contains(keyword, ":") {
 				info.Time = keyword
 			}

@@ -15,32 +15,24 @@ import (
 )
 
 const (
-	GUILD_LIMIT = 100
+	guildLimit  = 100 // Maximum number of guilds for name change
+	maxTimeouts = 5   // Maximum number of consecutive timeouts before marking server as offline
 )
 
+// Discord bot configuration
 type Bot struct {
-	Name           string       `yaml:"name"`
-	DiscordToken   string       `yaml:"discord_token"`
-	UpdateInterval int          `yaml:"update_interval"`
-	Server         types.Server `yaml:"server"`
+	Name           string       `yaml:"name"`            // Bot display name
+	DiscordToken   string       `yaml:"discord_token"`   // Discord bot token
+	UpdateInterval int          `yaml:"update_interval"` // Status update interval in seconds
+	Server         types.Server `yaml:"server"`          // DayZ server configuration
 }
 
-func updateStatus(s *discordgo.Session, status string, state string) (err error) {
-	data := discordgo.UpdateStatusData{
-		Status: status,
-	}
-
-	if state != "" {
-		data.Activities = []*discordgo.Activity{{
-			Name:  "0_o",
-			Type:  discordgo.ActivityTypeCustom,
-			State: state,
-		}}
-	}
-
-	return s.UpdateStatusComplex(data)
+// isStatusChanged checks if any of the server status values have changed
+func isStatusChanged(res dayz.ServerInfo, online byte, queue, time string) bool {
+	return online != res.Players || queue != res.Queue || time != res.Time
 }
 
+// isDay determines if the given time string represents daytime (06:00-19:59)
 func isDay(time string) (bool, error) {
 	res := strings.Split(time, ":")
 
@@ -56,6 +48,108 @@ func isDay(time string) (bool, error) {
 	return false, nil
 }
 
+// buildStatusString creates a formatted status string for Discord presence.
+// Format: 👤 5/20 (+3) | 🌞 12:30
+func buildStateString(res *dayz.ServerInfo, emojis types.Emojis) (string, error) {
+	onlineString := fmt.Sprintf(" %v %v/%v", emojis.Human, res.Players, res.MaxPlayers)
+
+	queueString := ""
+	if res.Queue != "" && res.Queue != "0" {
+		queueString = fmt.Sprintf(" (+%s)", res.Queue)
+	}
+
+	timeString := ""
+	if res.Time != "" {
+		emoji := emojis.Night
+		if ok, err := isDay(res.Time); ok {
+			if err != nil {
+				return "", err
+			}
+
+			emoji = emojis.Day
+		}
+		timeString = fmt.Sprintf(" | %v %v", emoji, res.Time)
+	}
+
+	return fmt.Sprintf("%v%v%v", onlineString, queueString, timeString), nil
+}
+
+// updateStatus updates the Discord bot's presence status
+func updateStatus(discord *discordgo.Session, status string, state string) error {
+	data := discordgo.UpdateStatusData{
+		Status: status,
+	}
+
+	if state != "" {
+		data.Activities = []*discordgo.Activity{{
+			Name:  "0_o",
+			Type:  discordgo.ActivityTypeCustom,
+			State: state,
+		}}
+	}
+
+	return discord.UpdateStatusComplex(data)
+}
+
+// handleServerError handles server connection errors and timeout logic
+func handleServerError(err error, timeouts *int, maxTimeouts int, discord *discordgo.Session, log *slog.Logger, offlineText string) {
+	log.Error(
+		"Server is offline, or the IP address or port is incorrect.",
+		"error", err,
+	)
+	(*timeouts)++
+
+	if *timeouts >= maxTimeouts {
+		updateStatus(discord, "dnd", offlineText)
+	}
+}
+
+// Updates the bot's Discord status with actual server information
+func updateServerStatus(discord *discordgo.Session, log *slog.Logger, res *dayz.ServerInfo, emojis types.Emojis, online *byte, queue, time *string) error {
+	*online, *queue, *time = res.Players, res.Queue, res.Time
+
+	state, err := buildStateString(res, emojis)
+	if err != nil {
+		return err
+	}
+
+	err = updateStatus(discord, "online", state)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Bot info updated",
+		"bot", res.Name,
+		"players", res.Players,
+		"queue", res.Queue,
+		"time", res.Time,
+	)
+
+	return nil
+}
+
+// Changes the bot's nickname to the configured name in all guilds
+func updateBotNameInAllGuilds(discord *discordgo.Session, log *slog.Logger, name string) error {
+	guilds, err := discord.UserGuilds(guildLimit, "", "", false)
+	if err != nil {
+		log.Error("Failed to retrieve guilds.",
+			"error", err,
+		)
+
+		return err
+	}
+
+	for _, g := range guilds {
+		err := discord.GuildMemberNickname(g.ID, "@me", name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Runs the bot and begins monitoring the DayZ server
 func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) error {
 	log := prettylog.NewLogger(slog.LevelDebug, false)
 
@@ -70,77 +164,47 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 	}
 	defer discord.Close()
 
-	log.Info(fmt.Sprintf("Bot for \"%s\" started successfully", b.Name),
+	log.Info(fmt.Sprintf("Bot for \"%s\" started", b.Name),
 		"name", b.Name,
 		"ip", fmt.Sprintf("%v:%v", b.Server.Ip, b.Server.Port),
 		"interval", fmt.Sprintf("%ds", b.UpdateInterval),
 	)
 
-	// получение всех серверов, на которых находится бот.
-	guilds, err := discord.UserGuilds(GUILD_LIMIT, "", "", false)
-	if err != nil {
-		log.Error("Do not disturb.",
-			"error", err,
-		)
-	}
-
-	// изменение имени боту (на имя из конфига) на всех серверах, где он находится.
-	for _, g := range guilds {
-		err := discord.GuildMemberNickname(g.ID, "@me", b.Name)
-		if err != nil {
-			return err
-		}
-	}
+	updateBotNameInAllGuilds(discord, log, b.Name)
 
 	ticker := time.NewTicker(time.Duration(b.UpdateInterval) * time.Second)
 	defer ticker.Stop()
 
-	getServerInfo := dayz.GetServerInfo(b.Server.Ip, b.Server.QueryPort)
+	server := dayz.Server{
+		Ip:        b.Server.Ip,
+		QueryPort: b.Server.QueryPort,
+	}
+
+	var timeouts int
+	var online byte
+	var queue, time string
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			timeouts, res, err := getServerInfo()
+			res, err := server.GetServerInfo()
 			if err != nil {
-				log.Error(
-					"Server is offline, or the IP address or port is incorrect.",
-					"error", err,
-				)
-
-				if timeouts >= 5 {
-					updateStatus(
-						discord,
-						"dnd",
-						offlineText,
-					)
-				}
-
+				handleServerError(err, &timeouts, maxTimeouts, discord, log, offlineText)
 				continue
 			}
 
-			online := fmt.Sprintf(" %v %v/%v", emojis.Human, res.Players, res.MaxPlayers)
-			queue := ""
-			time := ""
+			timeouts = 0
 
-			if res.Queue != "" && res.Queue != "0" {
-				queue = fmt.Sprintf(" (+%s)", res.Queue)
+			if !isStatusChanged(res, online, queue, time) {
+				continue
 			}
 
-			if res.Time != "" {
-				if ok, _ := isDay(res.Time); ok {
-					time = fmt.Sprintf(" | %v %v", emojis.Day, res.Time)
-				} else {
-					time = fmt.Sprintf(" | %v %v", emojis.Night, res.Time)
-				}
+			err = updateServerStatus(discord, log, &res, emojis, &online, &queue, &time)
+			if err != nil {
+				return err
 			}
-
-			updateStatus(
-				discord,
-				"online",
-				fmt.Sprintf("%v%v%v", online, queue, time),
-			)
 		}
 	}
 }

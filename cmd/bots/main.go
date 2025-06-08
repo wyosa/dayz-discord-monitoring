@@ -30,13 +30,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	cfg, err := config.MustLoad(*configPath)
-	if err != nil {
-		log.Error("Cannot read config",
-			"error", err,
-		)
-		return
-	}
+	cfg := config.MustLoad(*configPath)
 
 	wg := &sync.WaitGroup{}
 
