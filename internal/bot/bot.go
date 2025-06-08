@@ -94,7 +94,7 @@ func updateStatus(discord *discordgo.Session, status string, state string) error
 // handleServerError handles server connection errors and timeout logic.
 func handleServerError(err error, timeouts *int, maxTimeouts int, discord *discordgo.Session, log *slog.Logger, offlineText string) error {
 	log.Error(
-		"Server is offline, or the IP address or port is incorrect.",
+		"Failed to connect to the server. It may be turned off, or the IP address or port might be incorrect.",
 		"error", err,
 	)
 	(*timeouts)++
@@ -123,8 +123,7 @@ func updateServerStatus(discord *discordgo.Session, log *slog.Logger, res *dayz.
 		return err
 	}
 
-	log.Info("Bot info updated",
-		"bot", res.Name,
+	log.Info(fmt.Sprintf("Bot \"%s\" has been updated", res.Name),
 		"players", res.Players,
 		"queue", res.Queue,
 		"time", res.Time,
@@ -169,8 +168,7 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 	}
 	defer discord.Close()
 
-	log.InfoContext(ctx, fmt.Sprintf("Bot for \"%s\" started", b.Name),
-		"name", b.Name,
+	log.InfoContext(ctx, fmt.Sprintf("Bot for \"%s\" has started", b.Name),
 		"ip", fmt.Sprintf("%v:%v", b.Server.IP, b.Server.Port),
 		"interval", fmt.Sprintf("%ds", b.UpdateInterval),
 	)
