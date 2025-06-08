@@ -111,6 +111,7 @@ func (h *Handler) computeAttrs(
 }
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
+
 	level := r.Level.String() + ":"
 
 	switch r.Level {
@@ -143,6 +144,8 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	if len(attrs) > 0 {
 		args = append(args, colorize(darkGray, string(bytes)))
 	}
+
+	fmt.Println(args...)
 
 	return nil
 }
