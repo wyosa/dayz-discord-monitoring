@@ -7,8 +7,8 @@
    <br />
 </div>
 
-# 🧟 DDM (dayz-discord-monitoring)
-📊 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers, displaying server status, player numbers, and in-game time in Discord.
+## 🧟 DDM (dayz-discord-monitoring)
+📊 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers.
 
 ## 📝 Requirements
 
