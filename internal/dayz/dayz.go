@@ -13,6 +13,17 @@ import (
 type Server struct {
 	IP        string // Server IP address
 	QueryPort int    // Query port for A2S_INFO requests
+	Timeouts int     // Timeout counter
+}
+
+// Reset timeout counter.
+func (s *Server) ResetTimeout() {
+	s.Timeouts = 0
+}
+
+// Increment timeout counter.
+func (s *Server) Timeout() {
+	s.Timeouts++
 }
 
 // ServerInfo contains all information returned by A2S_INFO query.

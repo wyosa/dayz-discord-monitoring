@@ -37,7 +37,7 @@
 
 ### 📄 Example config (`./config/config.example.yaml`)
 ```yaml
-offline: "Server offline" # The name shown for the bot when the DayZ server is offline. This will be applied across all Discord guilds where the bot is present.
+offline: "Server offline" # The status shown for the bot when the DayZ server is offline. This will be applied across all Discord guilds where the bot is present.
 
 emojis:
   human: "👤" # Emoji representing human players; used to indicate the number of players online.

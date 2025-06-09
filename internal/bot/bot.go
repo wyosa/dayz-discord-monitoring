@@ -51,15 +51,15 @@ func isDay(time string) (bool, error) {
 // buildStatusString creates a formatted status string for Discord presence.
 // Format: 👤 5/20 (+3) | 🌞 12:30.
 func buildStateString(res *dayz.ServerInfo, emojis types.Emojis) (string, error) {
-	onlineString := fmt.Sprintf(" %v %v/%v", emojis.Human, res.Players, res.MaxPlayers)
+	var queueString, timeString, onlineString string
 
-	queueString := ""
-	if res.Queue != "" && res.Queue != "0" {
+	onlineString = fmt.Sprintf(" %v %v/%v", emojis.Human, res.Players, res.MaxPlayers)
+
+	if len(res.Queue) > 0 && res.Queue != "0" {
 		queueString = fmt.Sprintf(" (+%s)", res.Queue)
 	}
 
-	timeString := ""
-	if res.Time != "" {
+	if len(res.Time) > 0 {
 		emoji := emojis.Night
 		if ok, err := isDay(res.Time); ok {
 			if err != nil {
@@ -92,14 +92,15 @@ func updateStatus(discord *discordgo.Session, status string, state string) error
 }
 
 // handleServerError handles server connection errors and timeout logic.
-func handleServerError(err error, timeouts *int, maxTimeouts int, discord *discordgo.Session, log *slog.Logger, offlineText string) error {
+func handleServerError(err error, server *dayz.Server, maxTimeouts int, discord *discordgo.Session, log *slog.Logger, offlineText string) error {
 	log.Error(
 		"Failed to connect to the server. It may be turned off, or the IP address or port might be incorrect.",
 		"error", err,
 	)
-	(*timeouts)++
 
-	if *timeouts >= maxTimeouts {
+	server.Timeout()
+
+	if server.Timeouts >= maxTimeouts {
 		err = updateStatus(discord, "dnd", offlineText)
 		if err != nil {
 			return err
@@ -126,7 +127,7 @@ func updateServerStatus(discord *discordgo.Session, log *slog.Logger, res *dayz.
 	log.Info(fmt.Sprintf("Bot \"%s\" has been updated", res.Name),
 		"players", res.Players,
 		"queue", res.Queue,
-		"time", res.Time,
+		"server-time", res.Time,
 	)
 
 	return nil
@@ -188,7 +189,6 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 		QueryPort: b.Server.QueryPort,
 	}
 
-	var timeouts int
 	var online byte
 	var queue, time string
 
@@ -199,7 +199,7 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 		case <-ticker.C:
 			res, err := server.GetServerInfo()
 			if err != nil {
-				err = handleServerError(err, &timeouts, maxTimeouts, discord, log, offlineText)
+				err = handleServerError(err, &server, maxTimeouts, discord, log, offlineText)
 				if err != nil {
 					return err
 				}
@@ -207,7 +207,9 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 				continue
 			}
 
-			timeouts = 0
+			if server.Timeouts > 0 {
+				server.ResetTimeout()
+			}
 
 			if !isStatusChanged(res, online, queue, time) {
 				continue
