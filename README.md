@@ -35,7 +35,12 @@
 
 ## 🕹️ Usage
 
-### 📄 Example config (`./config/config.example.yaml`)
+### 📄 Config
+
+This YAML file defines global settings and a list of individual bot instances. Each bot monitors a specific DayZ server and updates its Discord presence accordingly.
+
+Path: `./config/config.example.yaml`
+
 ```yaml
 offline: "Server offline" # The status shown for the bot when the DayZ server is offline. This will be applied across all Discord guilds where the bot is present.
 
