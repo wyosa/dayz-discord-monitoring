@@ -175,7 +175,9 @@ func (b *Bot) Run(ctx context.Context, emojis types.Emojis, offlineText string) 
 
 	err = updateBotNameInAllGuilds(discord, log, b.Name)
 	if err != nil {
-		return err
+		log.Error(fmt.Sprintf("Failed to update bot \"%s\" name", b.Name),
+			"error", err,
+		)
 	}
 
 	ticker := time.NewTicker(time.Duration(b.UpdateInterval) * time.Second)

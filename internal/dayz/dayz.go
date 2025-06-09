@@ -50,7 +50,7 @@ const (
 )
 
 // GetServerInfo queries the DayZ server for current status information.
-// Uses the A2S_INFO protocol to retrieve server details.
+// Uses the A2S_INFO query to retrieve server details.
 func (server Server) GetServerInfo() (ServerInfo, error) {
 	parsedIP := net.ParseIP(server.IP)
 	if parsedIP == nil {
