@@ -19,19 +19,19 @@
 ## ⚙️ Installation
 
 1. Clone the repository:
-```
-git clone https://github.com/intejie/dayz-discord-monitoring.git
-```
+   ```
+   git clone https://github.com/intejie/dayz-discord-monitoring.git
+   ```
 
 2. Install dependencies:
-```
-go mod download
-```
+   ```
+   go mod download
+   ```
 
-3. Build the binary:
-```
-go build ./cmd/bots
-```
+4. Build the binary:
+   ```
+   go build ./cmd/bots
+   ```
 
 ## 🕹️ Usage
 
