@@ -21,6 +21,7 @@
 1. Clone the repository:
    ```
    git clone https://github.com/intejie/dayz-discord-monitoring.git
+   cd dayz-discord-monitoring
    ```
 
 2. Install dependencies:
