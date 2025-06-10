@@ -1,0 +1,7 @@
+.DS_Store
+config.yaml
+
+# binaries
+bots.exe
+bots.app
+bots
