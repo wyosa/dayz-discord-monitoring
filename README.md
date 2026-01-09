@@ -7,16 +7,15 @@
    <br />
 </div>
 
-## 🧟 DDM (dayz-discord-monitoring)
-📊 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers.
+A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers.
 
-## 📝 Requirements
+## Requirements
 
 - **[Golang](https://go.dev/doc/install)** (version 1.24.4 or later)
 - A **DayZ** server with accessible IP and port.
 - **[Discord Developer Portal](https://discord.com/developers/applications)** bot tokens for each server you wish to monitor.
 
-## ⚙️ Installation
+## Installation
 
 1. Clone the repository:
    ```
@@ -34,9 +33,9 @@
    go build ./cmd/bots
    ```
 
-## 🕹️ Usage
+## Usage
 
-### 📄 Config
+### Config
 
 This YAML file defines global settings and a list of individual bot instances. Each bot monitors a specific DayZ server and updates its Discord presence accordingly.
 
@@ -69,7 +68,7 @@ bots:
 
 ```
 
-### 🚀 Launching the bots
+### Launching the bots
 Run the bot by specifying the path to your configuration file:
 ```bash
 # Windows
