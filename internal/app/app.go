@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"playground/internal/bot"
 	"playground/internal/config"
@@ -11,40 +10,26 @@ import (
 )
 
 type App struct {
-	config *config.Config
-	log    *slog.Logger
+	config          *config.Config
+	log             *slog.Logger
+	shutdownTimeout time.Duration
 }
 
 const (
-	timeoutTime = 10
+	defaultShutdownTimeout = 10 * time.Second
 )
 
 func New(cfg *config.Config, log *slog.Logger) *App {
 	return &App{
-		config: cfg,
-		log:    log,
+		config:          cfg,
+		log:             log,
+		shutdownTimeout: defaultShutdownTimeout,
 	}
 }
 
 func (app *App) Run(ctx context.Context) error {
-	app.printWelcomeMessages()
+	app.log.Info("Starting application", "bots_count", len(app.config.Bots))
 
-	wg := app.startBots(ctx)
-
-	<-ctx.Done()
-	app.log.Info("Shutting down all bots...")
-
-	app.gracefulShutdown(wg)
-
-	return nil
-}
-
-func (app *App) printWelcomeMessages() {
-	app.log.Info("⭐ If you find this bot useful, drop a star on GitHub •`_´•")
-	app.log.Info("💡 Any issues or ideas? Let me know by opening an issue.")
-}
-
-func (app *App) startBots(ctx context.Context) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 
 	for _, botConfig := range app.config.Bots {
@@ -52,19 +37,31 @@ func (app *App) startBots(ctx context.Context) *sync.WaitGroup {
 		go app.runBot(ctx, botConfig, wg)
 	}
 
-	return wg
+	<-ctx.Done()
+	app.log.Info("Shutdown signal received")
+
+	return app.gracefulShutdown(wg)
 }
 
 func (app *App) runBot(ctx context.Context, b bot.Bot, wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	app.log.Info("Starting bot", "name", b.Name)
+
 	err := b.Run(ctx, app.config.Emojis, app.config.OfflineText)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		app.log.Error("Bot failed", "bot", b.Name, "error", err)
+	if err != nil {
+		if ctx.Err() != nil {
+			app.log.Debug("Bot stopped due to context cancellation", "name", b.Name)
+			return
+		}
+
+		app.log.Error("Bot failed", "name", b.Name, "error", err)
 	}
 }
 
-func (app *App) gracefulShutdown(wg *sync.WaitGroup) {
+func (app *App) gracefulShutdown(wg *sync.WaitGroup) error {
+	app.log.Info("Initiating graceful shutdown")
+
 	done := make(chan struct{})
 
 	go func() {
@@ -75,7 +72,9 @@ func (app *App) gracefulShutdown(wg *sync.WaitGroup) {
 	select {
 	case <-done:
 		app.log.Info("All bots shut down successfully")
-	case <-time.After(timeoutTime * time.Second):
-		app.log.Warn("Force shutdown after timeout")
+		return nil
+	case <-time.After(app.shutdownTimeout):
+		app.log.Warn("Graceful shutdown timeout exceeded, forcing exit")
+		return context.DeadlineExceeded
 	}
 }
