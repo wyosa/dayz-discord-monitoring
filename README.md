@@ -19,7 +19,7 @@ A lightweight Go tool that launches multiple Discord bots to monitor DayZ server
 
 1. Clone the repository:
    ```
-   git clone https://github.com/intejie/dayz-discord-monitoring.git
+   git clone https://github.com/wyosa/dayz-discord-monitoring.git
    cd dayz-discord-monitoring
    ```
 
