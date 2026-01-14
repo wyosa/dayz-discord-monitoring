@@ -136,9 +136,9 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	args := []any{
-		colorize(lightGray, r.Time.Format(timeFormat)),
+		r.Time.Format(timeFormat),
 		level,
-		colorize(white, r.Message),
+		r.Message,
 	}
 
 	if len(attrs) > 0 {
