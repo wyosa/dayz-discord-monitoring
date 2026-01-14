@@ -1,13 +1,19 @@
 <div align="center">
-<img src="./.readme/assets/profile.png" alt="Profile view"/>
-<br />
-<br />
-<img src="./.readme/assets/sidebar.png" alt="Sidebar view"/>
-<br />
-<br />
+   <img src="./.readme/assets/profile.png" alt="Profile view"/>
+   <br />
+   <i>Bot profile showing real-time server status with player count and in-game time</i>
+   <br />
+   <br />
+   <img src="./.readme/assets/sidebar.png" alt="Sidebar view"/>
+   <br />
+   <i>Discord sidebar showing bot's custom status</i>
+   <br />
+   <br />
 </div>
 
 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers in real-time.
+
+**[Requirements](#requirements)** • **[Quick Start](#quick-start)** • **[Quick Start with Docker](#quick-start-with-docker)** • **[Configuration Options](#configuration-options)**
 
 ## Requirements
 
@@ -46,6 +52,42 @@ bots.exe -config="config/config.yaml"
 
 # Linux/MacOS
 ./bots -config="config/config.yaml"
+```
+
+## Quick Start with Docker
+
+#### 1. Clone and navigate to the project
+
+```bash
+git clone https://github.com/intejie/dayz-discord-monitoring.git
+
+cd dayz-discord-monitoring
+```
+
+#### 2. Configure your bots
+
+```bash
+cp config/config.example.yaml config/config.yaml
+# Edit config/config.yaml with your bot tokens and server details
+```
+
+#### 3. Build Docker image
+
+```bash
+docker build -t dayz-discord-monitoring .
+```
+
+#### 4. Run with Docker
+
+```bash
+# Linux/MacOS
+docker run -v $(pwd)/config:/app/config dayz-discord-monitoring
+
+# Windows PowerShell
+docker run -v ${PWD}/config:/app/config dayz-discord-monitoring
+
+# Run in background
+docker run -d -v $(pwd)/config:/app/config dayz-discord-monitoring
 ```
 
 ## Configuration Options
