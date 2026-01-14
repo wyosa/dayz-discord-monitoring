@@ -15,19 +15,13 @@
 
 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers in real-time.
 
-### Navigation
-- [Requirements](#requirements)  
-- [Quick Start](#quick-start)  
-- [Quick Start with Docker](#quick-start-with-docker)  
-- [Configuration Options](#configuration-options)
-
-## Requirements
+## 📋 Requirements
 
 - **[Golang](https://go.dev/doc/install)** (version 1.24.4 or later)
 - A **DayZ** server with accessible IP and query port
 - **Discord bot token** from [Discord Developer Portal](https://discord.com/developers/applications) with Administrator permissions (or at least change nickname and change presence permissions)
 
-## Quick Start
+## ⚡ Quick Start
 
 #### 1. Clone and navigate to the project
 
@@ -60,7 +54,7 @@ bots.exe -config="config/config.yaml"
 ./bots -config="config/config.yaml"
 ```
 
-## Quick Start with Docker
+## 🐳 Quick Start with Docker
 
 #### 1. Clone and navigate to the project
 
@@ -96,7 +90,7 @@ docker run -v ${PWD}/config:/app/config dayz-discord-monitoring
 docker run -d -v $(pwd)/config:/app/config dayz-discord-monitoring
 ```
 
-## Configuration Options
+## ⚙️ Configuration Options
 
 | Field                      | Description                         | Example                                                                |
 | -------------------------- | ----------------------------------- | ---------------------------------------------------------------------- |
