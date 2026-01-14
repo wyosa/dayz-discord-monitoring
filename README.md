@@ -9,11 +9,17 @@
    <i>Discord sidebar showing bot's custom status</i>
    <br />
    <br />
+   <br />
+   <br />
 </div>
 
 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers in real-time.
 
-**[Requirements](#requirements)** • **[Quick Start](#quick-start)** • **[Quick Start with Docker](#quick-start-with-docker)** • **[Configuration Options](#configuration-options)**
+### Navigation
+- [Requirements](#requirements)  
+- [Quick Start](#quick-start)  
+- [Quick Start with Docker](#quick-start-with-docker)  
+- [Configuration Options](#configuration-options)
 
 ## Requirements
 
