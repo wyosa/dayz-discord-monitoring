@@ -1,80 +1,65 @@
 <div align="center">
-   <img src="./.readme/assets/profile.png" alt="Profile view"/>
-   <br />
-   <br />
-   <img src="./.readme/assets/sidebar.png" alt="Sidebar view"/>
-   <br />
-   <br />
+<img src="./.readme/assets/profile.png" alt="Profile view"/>
+<br />
+<br />
+<img src="./.readme/assets/sidebar.png" alt="Sidebar view"/>
+<br />
+<br />
 </div>
 
-## 🧟 DDM (dayz-discord-monitoring)
-📊 A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers.
+A lightweight Go tool that launches multiple Discord bots to monitor DayZ servers in real-time.
 
-## 📝 Requirements
+## Requirements
 
 - **[Golang](https://go.dev/doc/install)** (version 1.24.4 or later)
-- A **DayZ** server with accessible IP and port.
-- **[Discord Developer Portal](https://discord.com/developers/applications)** bot tokens for each server you wish to monitor.
+- A **DayZ** server with accessible IP and query port
+- **Discord bot token** from [Discord Developer Portal](https://discord.com/developers/applications) with Administrator permissions (or at least change nickname and change presence permissions)
 
-## ⚙️ Installation
+## Quick Start
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/intejie/dayz-discord-monitoring.git
-   cd dayz-discord-monitoring
-   ```
+#### 1. Clone and navigate to the project
 
-2. Install dependencies:
-   ```
-   go mod download
-   ```
+```bash
+git clone https://github.com/wyosa/dayz-discord-monitoring.git
 
-4. Build the binary:
-   ```
-   go build ./cmd/bots
-   ```
+cd dayz-discord-monitoring
+```
 
-## 🕹️ Usage
+#### 2. Configure your bots
 
-### 📄 Config
+```bash
+cp config/config.example.yaml config/config.yaml
+# Edit config/config.yaml with your bot tokens and server details
+```
 
-This YAML file defines global settings and a list of individual bot instances. Each bot monitors a specific DayZ server and updates its Discord presence accordingly.
+#### 3. Build
 
-Path: `./config/config.example.yaml`
-
-```yaml
-offline: "Server offline" # The status shown for the bot when the DayZ server is offline. This will be applied across all Discord guilds where the bot is present.
-
-emojis:
-  human: "👤" # Emoji representing human players; used to indicate the number of players online.
-  day: "☀️" # Emoji indicating it's daytime in the DayZ server.
-  night: "🌕" # Emoji indicating it's nighttime in the DayZ server.
-
-bots:
-- name: "Server #1" # The display name for this bot instance (max 32 characters).
-  discord_token: "YOUR_DISCORD_BOT_TOKEN" # The Discord bot token from the Developer Portal.
-  update_interval: 10 # How often (in seconds) the bot fetches data from the DayZ server and updates its status.
-  server:
-    ip: "127.0.0.1" # IP address of the DayZ game server to monitor.
-    port: 2801 # Game port of the DayZ server.
-    query_port: 2802 # Query port of the DayZ server (used to fetch server info).
-
-- name: "Server #2" # Another bot instance monitoring a different server.
-  discord_token: "YOUR_DISCORD_BOT_TOKEN"
-  update_interval: 10
-  server:
-    ip: "127.0.0.2"
-    port: 2802
-    query_port: 2803
+```bash
+go build -o bots ./cmd/bots
 
 ```
 
-### 🚀 Launching the bots
-Run the bot by specifying the path to your configuration file:
+#### 4. Run
+
 ```bash
 # Windows
-bots.exe -config="path/to/config.yaml"
+bots.exe -config="config/config.yaml"
 
-#Linux, MacOS
-./bots -config="path/to/config.yaml"
+# Linux/MacOS
+./bots -config="config/config.yaml"
 ```
+
+## Configuration Options
+
+| Field                      | Description                         | Example                                                                |
+| -------------------------- | ----------------------------------- | ---------------------------------------------------------------------- |
+| `offline`                  | Status text when server is offline  | `"Server offline"`                                                     |
+| `emojis.human`             | Emoji for player count              | `"👤"`                                                                 |
+| `emojis.day`               | Emoji for daytime (06:00-19:59)     | `"☀️"`                                                                 |
+| `emojis.night`             | Emoji for nighttime (20:00-05:59)   | `"🌕"`                                                                 |
+| `bots[].name`              | Bot display name (max 32 chars)     | `"My Server"`                                                          |
+| `bots[].discord_token`     | Your Discord bot token              | Get from [Discord Portal](https://discord.com/developers/applications) |
+| `bots[].update_interval`   | Update frequency in seconds (min 5) | `10`                                                                   |
+| `bots[].server.ip`         | DayZ server IP address              | `"123.456.789.0"`                                                      |
+| `bots[].server.port`       | DayZ server port                    | `2302`                                                                 |
+| `bots[].server.query_port` | DayZ server query port              | `27016`                                                                |
