@@ -40,7 +40,6 @@ go build -o bots ./cmd/bots
 ```
 
 #### 4. Run
-
 ```bash
 # Windows
 bots.exe -config="config/config.yaml"
