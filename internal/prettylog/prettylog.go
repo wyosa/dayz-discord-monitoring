@@ -32,7 +32,7 @@ const (
 )
 
 const (
-	timeFormat = "[15:04:05.000]"
+	timeFormat = "[2006-01-02 15:04:05]"
 )
 
 func colorize(colorCode int, v string) string {
