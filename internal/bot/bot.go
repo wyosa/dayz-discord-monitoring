@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	guildLimit int  = 100 // Maximum number of guilds for name change
+	guildLimit  int = 100 // Maximum number of guilds for name change
 	maxTimeouts int = 5   // Maximum number of consecutive timeouts before marking server as offline
 )
 
