@@ -28,7 +28,7 @@ func New(cfg *config.Config, log *slog.Logger) *App {
 }
 
 func (app *App) Run(ctx context.Context) error {
-	app.log.Info("Starting application", "bots_count", len(app.config.Bots))
+	app.printWelcomeMessages()
 
 	wg := &sync.WaitGroup{}
 
@@ -41,6 +41,11 @@ func (app *App) Run(ctx context.Context) error {
 	app.log.Info("Shutdown signal received")
 
 	return app.gracefulShutdown(wg)
+}
+
+func (app *App) printWelcomeMessages() {
+	app.log.Info("⭐ If you find this bot useful, drop a star on GitHub •`_´•")
+	app.log.Info("💡 Any issues or ideas? Let me know by opening an issue.")
 }
 
 func (app *App) runBot(ctx context.Context, b bot.Bot, wg *sync.WaitGroup) {
